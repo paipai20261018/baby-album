@@ -341,6 +341,11 @@ function compress(file,maxSide=1600,quality=.85){
 }
 /* 视频大小校验：超过 80MB 跳过（IndexedDB 存大文件易失败） */
 const VIDEO_MAX=80*1024*1024;
+/* 本地日期字符串（避免 toISOString 的 UTC 时区偏移） */
+function localDateStr(d=new Date()){
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
 
 /* ================= 状态 ================= */
 let baby=JSON.parse(localStorage.getItem('baby')||'null');
@@ -352,12 +357,12 @@ function renderHome(){
   if(baby){
     $('#babyEmoji').textContent=baby.emoji||'👶';
     $('#babyName').textContent=baby.name||'我家宝宝';
-    const today=new Date().toISOString().slice(0,10);
+    const today=localDateStr();
     $('#babyAge').textContent=baby.birth?`🎂 ${fmtDate(baby.birth)} · 已经 ${calcAge(baby.birth,today)}`:'生日未设置';
   }
   const nPhotos=entries.reduce((a,e)=>a+(e.photos||[]).length,0);
   const nVideos=entries.reduce((a,e)=>a+(e.videos||[]).length,0);
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr();
   const todayFeeds=feeds.filter(f=>(f.ts||'').slice(0,10)===today);
   const todayMl=todayFeeds.reduce((a,f)=>a+(f.ml||0),0);
   $('#stats').innerHTML=`
@@ -657,7 +662,7 @@ function renderTrend(){
   if(days.length){
     const start=new Date(days[0]+'T00:00:00'), end=new Date(days[days.length-1]+'T00:00:00');
     for(let t=new Date(start);t<=end;t.setDate(t.getDate()+1)){
-      const k=t.toISOString().slice(0,10);
+      const k=localDateStr(t);
       series.push({day:k,ml:byDay[k]||0});
     }
     if(series.length>30)series=series.slice(-30);
@@ -851,7 +856,7 @@ $('#btnExport').onclick=async()=>{
   const data=JSON.stringify({v:2,baby,entries:es,growth:gs,feeds:fs});
   const blob=new Blob([data],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`宝宝相册备份-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  a.download=`宝宝相册备份-${localDateStr()}.json`;a.click();
 };
 $('#btnImport').onclick=()=>$('#fImport').click();
 $('#fImport').onchange=async e=>{
@@ -882,7 +887,7 @@ $('#btnWipe').onclick=async()=>{
 };
 function switchTab(t){document.querySelector(`nav [data-tab="${t}"]`).click()}
 // 默认日期
-const today=new Date().toISOString().slice(0,10);
+const today=localDateStr();
 $('#fDate').value=today;$('#gDate').value=today;
 
 /* ================= PWA ================= */
