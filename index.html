@@ -369,7 +369,7 @@ function renderHome(){
     <div class="stat"><b>${entries.length}</b><span>成长记录</span></div>
     <div class="stat"><b>${nPhotos}</b><span>照片</span></div>
     <div class="stat"><b>${nVideos}</b><span>视频</span></div>
-    <div class="stat"><b>${todayMl?todayMl+'ml':todayFeeds.length+'次'}</b><span>今日母乳</span></div>
+    <div class="stat"><b>${todayFeeds.length}次</b><span>今日母乳<br><span style="font-size:.68rem">${todayMl}ml</span></span></div>
     <div class="stat"><b>${growthData.length}</b><span>生长数据</span></div>
     <div class="stat"><b>${entries.filter(e=>e.tag==='🎉 里程碑').length}</b><span>里程碑</span></div>`;
   const recent=sortEntries(entries).slice(0,5);
@@ -547,6 +547,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   ['home','add','timeline','trend','settings'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
   if(b.dataset.tab==='timeline')renderTimeline();
   if(b.dataset.tab==='trend')renderTrend();
+  if(b.dataset.tab==='home')renderHome(); // 每次回首页都重新统计（跨天也正确）
 });
 // 照片/视频选择
 const drop=$('#drop'),fileInput=$('#fPhotos');
@@ -886,6 +887,10 @@ $('#btnWipe').onclick=async()=>{
   localStorage.removeItem('baby');baby=null;await loadAll();alert('已清空');
 };
 function switchTab(t){document.querySelector(`nav [data-tab="${t}"]`).click()}
+// 从后台切回时自动刷新统计（防止跨天后"今日"数据过期）
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){renderHome();if(!$('#tab-trend').classList.contains('hidden'))renderTrend()}
+});
 // 默认日期
 const today=localDateStr();
 $('#fDate').value=today;$('#gDate').value=today;
