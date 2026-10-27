@@ -1,0 +1,15 @@
+{
+  "name": "宝宝成长相册",
+  "short_name": "宝宝相册",
+  "description": "本地保存宝宝成长照片与记录的私密相册",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fdf6f0",
+  "theme_color": "#ffb6c1",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
