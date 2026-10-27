@@ -126,7 +126,7 @@
   <button class="active" data-tab="home"><span class="ic">🏠</span>首页</button>
   <button data-tab="add"><span class="ic">➕</span>添加</button>
   <button data-tab="timeline"><span class="ic">📷</span>时间轴</button>
-  <button data-tab="growth"><span class="ic">📈</span>成长曲线</button>
+  <button data-tab="trend"><span class="ic">📈</span>趋势</button>
   <button data-tab="settings"><span class="ic">⚙️</span>设置</button>
 </nav>
 <main>
@@ -169,6 +169,23 @@
       </div>
     </div>
     <div class="card">
+      <h2>🍼 吸母乳记录</h2>
+      <div class="row">
+        <div><label>时间</label><input id="fFeedTime" type="datetime-local"></div>
+        <div><label>毫升 (ml)</label><input id="fFeedMl" type="number" min="0" step="1" placeholder="如 120"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <span style="font-size:.8rem;color:var(--muted);line-height:34px">快捷：</span>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-quickml="60">60ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-quickml="90">90ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-quickml="120">120ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-quickml="150">150ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" id="btnNow">此刻</button>
+      </div>
+      <div class="actions"><button class="btn btn-primary" id="btnFeed">💾 保存吸乳记录</button></div>
+      <div id="feedRecent" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
       <h2>快速记录身高体重</h2>
       <div class="row">
         <div><label>日期</label><input id="gDate" type="date"></div>
@@ -194,10 +211,16 @@
     <div class="timeline" id="timeline"></div>
   </section>
 
-  <!-- 成长曲线 -->
-  <section id="tab-growth" class="hidden">
+  <!-- 趋势 -->
+  <section id="tab-trend" class="hidden">
     <div class="card">
-      <h2>身高体重记录</h2>
+      <h2>🍼 母乳量趋势</h2>
+      <div id="feedSummary" style="margin-bottom:8px"></div>
+      <canvas id="milkChart" width="880" height="340" style="width:100%"></canvas>
+      <div id="feedAllList" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>📏 身高体重记录</h2>
       <div id="growthList"></div>
       <canvas id="chart" width="880" height="360" style="width:100%;margin-top:14px"></canvas>
     </div>
@@ -259,7 +282,7 @@
 
 <script>
 /* ================= IndexedDB ================= */
-const DB_NAME='babyAlbum', DB_VER=1;
+const DB_NAME='babyAlbum', DB_VER=2;
 let db;
 function openDB(){return new Promise((res,rej)=>{
   const r=indexedDB.open(DB_NAME,DB_VER);
@@ -267,6 +290,7 @@ function openDB(){return new Promise((res,rej)=>{
     const d=e.target.result;
     if(!d.objectStoreNames.contains('entries'))d.createObjectStore('entries',{keyPath:'id'});
     if(!d.objectStoreNames.contains('growth'))d.createObjectStore('growth',{keyPath:'id'});
+    if(!d.objectStoreNames.contains('feeds'))d.createObjectStore('feeds',{keyPath:'id'});
     if(!d.objectStoreNames.contains('meta'))d.createObjectStore('meta',{keyPath:'key'});
   };
   r.onsuccess=e=>{db=e.target.result;res(db)};
@@ -321,7 +345,7 @@ const VIDEO_MAX=80*1024*1024;
 /* ================= 状态 ================= */
 let baby=JSON.parse(localStorage.getItem('baby')||'null');
 let pendingPhotos=[]; // {name, blob}
-let entries=[], growthData=[];
+let entries=[], growthData=[], feeds=[];
 
 /* ================= 渲染 ================= */
 function renderHome(){
@@ -333,10 +357,14 @@ function renderHome(){
   }
   const nPhotos=entries.reduce((a,e)=>a+(e.photos||[]).length,0);
   const nVideos=entries.reduce((a,e)=>a+(e.videos||[]).length,0);
+  const today=new Date().toISOString().slice(0,10);
+  const todayFeeds=feeds.filter(f=>(f.ts||'').slice(0,10)===today);
+  const todayMl=todayFeeds.reduce((a,f)=>a+(f.ml||0),0);
   $('#stats').innerHTML=`
     <div class="stat"><b>${entries.length}</b><span>成长记录</span></div>
     <div class="stat"><b>${nPhotos}</b><span>照片</span></div>
     <div class="stat"><b>${nVideos}</b><span>视频</span></div>
+    <div class="stat"><b>${todayMl?todayMl+'ml':todayFeeds.length+'次'}</b><span>今日母乳</span></div>
     <div class="stat"><b>${growthData.length}</b><span>生长数据</span></div>
     <div class="stat"><b>${entries.filter(e=>e.tag==='🎉 里程碑').length}</b><span>里程碑</span></div>`;
   const recent=sortEntries(entries).slice(0,5);
@@ -503,16 +531,17 @@ function renderTags(){
   $('#filterTag').innerHTML='<option value="">全部</option>'+tags.map(t=>`<option>${t}</option>`).join('');
 }
 async function loadAll(){
-  entries=await dbAll('entries');growthData=await dbAll('growth');
-  renderHome();renderTimeline();renderGrowth();
+  entries=await dbAll('entries');growthData=await dbAll('growth');feeds=await dbAll('feeds');
+  renderHome();renderTimeline();renderGrowth();renderFeedRecent();
 }
 
 /* ================= 交互 ================= */
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
-  ['home','add','timeline','growth','settings'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
+  ['home','add','timeline','trend','settings'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
   if(b.dataset.tab==='timeline')renderTimeline();
+  if(b.dataset.tab==='trend')renderTrend();
 });
 // 照片/视频选择
 const drop=$('#drop'),fileInput=$('#fPhotos');
@@ -591,6 +620,120 @@ $('#btnGrowth').onclick=async()=>{
   $('#gHeight').value='';$('#gWeight').value='';
   alert('✅ 已保存生长数据');loadAll();
 };
+
+/* ================= 吸母乳记录 ================= */
+function nowLocal(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+$('#fFeedTime').value=nowLocal();
+$('#btnNow').onclick=()=>{$('#fFeedTime').value=nowLocal()};
+document.querySelectorAll('[data-quickml]').forEach(b=>b.onclick=()=>{$('#fFeedMl').value=b.dataset.quickml});
+$('#btnFeed').onclick=async()=>{
+  const ts=$('#fFeedTime').value, ml=parseInt($('#fFeedMl').value,10);
+  if(!ts){alert('请选择时间');return}
+  if(isNaN(ml)||ml<=0){alert('请填写毫升数');return}
+  await dbPut('feeds',{id:uid(),ts,ml});
+  $('#fFeedMl').value='';
+  await loadAll();
+  alert(`✅ 已保存 ${ml}ml`);
+};
+function renderFeedRecent(){
+  const list=[...feeds].sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,5);
+  $('#feedRecent').innerHTML=list.length
+    ?'<div style="font-size:.8rem;color:var(--muted);margin-bottom:4px">最近 5 次</div>'+
+     list.map(f=>`<div class="record"><span>🍼 ${f.ts.replace('T',' ')}</span><b>${f.ml} ml</b></div>`).join('')
+    :'';
+}
+
+/* ================= 趋势页 ================= */
+function renderTrend(){
+  renderGrowth();
+  // 按天汇总母乳量（最近 14 天，无数据的天补 0）
+  const byDay={};
+  for(const f of feeds){const d=(f.ts||'').slice(0,10);if(d)byDay[d]=(byDay[d]||0)+(f.ml||0)}
+  const days=[...new Set([...Object.keys(byDay)])].sort();
+  let series=[];
+  if(days.length){
+    const start=new Date(days[0]+'T00:00:00'), end=new Date(days[days.length-1]+'T00:00:00');
+    for(let t=new Date(start);t<=end;t.setDate(t.getDate()+1)){
+      const k=t.toISOString().slice(0,10);
+      series.push({day:k,ml:byDay[k]||0});
+    }
+    if(series.length>30)series=series.slice(-30);
+  }
+  // 摘要
+  const last7=series.slice(-7), total7=last7.reduce((a,x)=>a+x.ml,0);
+  const avg7=last7.length?(total7/last7.length).toFixed(0):0;
+  const today=nowLocal().slice(0,10);
+  const todayMl=byDay[today]||0;
+  const best=series.length?series.reduce((a,b)=>b.ml>a.ml?b:a):null;
+  $('#feedSummary').innerHTML=feeds.length?`
+    <div class="stats" style="grid-template-columns:repeat(3,1fr);margin:0">
+      <div class="stat"><b>${todayMl}ml</b><span>今日总量</span></div>
+      <div class="stat"><b>${avg7}ml</b><span>近7天日均</span></div>
+      <div class="stat"><b>${best?best.ml+'ml':''}</b><span>单日最高${best?`<br><span style="font-size:.68rem">${best.day.slice(5)}</span>`:''}</span></div>
+    </div>`
+    :'<div class="empty" style="padding:16px 0"><span class="emoji">🍼</span>还没有吸乳记录，去「添加」页记一笔吧</div>';
+  drawMilkChart(series);
+  // 明细列表（最近 20 条）
+  const all=[...feeds].sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,20);
+  $('#feedAllList').innerHTML=all.length
+    ?'<div style="font-size:.85rem;color:var(--muted);margin-bottom:4px">最近 20 次记录</div>'+
+     all.map(f=>{
+       const d=f.ts.slice(0,10),t=f.ts.slice(11,16);
+       return `<div class="record"><span>${d} ${t}
+         <span class="age-badge">${calcAge(baby&&baby.birth,d)}</span></span>
+         <span><b>${f.ml} ml</b>
+         <button class="btn btn-danger" style="padding:2px 8px;font-size:.7rem;margin-left:8px" data-fdel="${f.id}">删</button></span></div>`;
+     }).join('')
+    :'';
+  document.querySelectorAll('[data-fdel]').forEach(b=>b.onclick=async()=>{
+    if(confirm('删除这条吸乳记录？')){await dbDel('feeds',b.dataset.fdel);await loadAll();renderTrend()}
+  });
+}
+function drawMilkChart(series){
+  const c=$('#milkChart'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  if(series.length<2){ctx.fillStyle='#a89696';ctx.font='15px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('至少需要两天数据才能绘制曲线（每天可记多次，自动按天合计）',c.width/2,c.height/2);return}
+  const P={l:56,r:16,t:20,b:40}, W=c.width-P.l-P.r, H=c.height-P.t-P.b;
+  const max=Math.max(...series.map(x=>x.ml),10)*1.15;
+  const xi=i=>P.l+W*i/(series.length-1);
+  const y=v=>c.height-P.b-H*v/max;
+  // 网格与轴
+  ctx.strokeStyle='#f5e3e6';ctx.lineWidth=1;ctx.textAlign='right';ctx.font='11px sans-serif';
+  for(let g=0;g<=4;g++){
+    const v=max*g/4, yy=y(v);
+    ctx.beginPath();ctx.moveTo(P.l,yy);ctx.lineTo(c.width-P.r,yy);ctx.stroke();
+    ctx.fillStyle='#a89696';ctx.fillText(Math.round(v),P.l-8,yy+4);
+  }
+  // 柱状（每日总量，浅色）
+  const bw=Math.max(2,W/series.length*0.5);
+  series.forEach((s,i)=>{
+    ctx.fillStyle=s.ml?'#ffd6de':'#faf5f5';
+    ctx.fillRect(xi(i)-bw/2,y(s.ml),bw,c.height-P.b-y(s.ml));
+  });
+  // 曲线
+  ctx.strokeStyle='#ff8fab';ctx.lineWidth=2.5;ctx.beginPath();
+  series.forEach((s,i)=>i?ctx.lineTo(xi(i),y(s.ml)):ctx.moveTo(xi(i),y(s.ml)));
+  ctx.stroke();
+  ctx.fillStyle='#f76a8c';
+  series.forEach((s,i)=>{ctx.beginPath();ctx.arc(xi(i),y(s.ml),3.5,0,7);ctx.fill()});
+  // 日期轴
+  ctx.fillStyle='#a89696';ctx.font='11px sans-serif';ctx.textAlign='center';
+  series.forEach((s,i)=>{
+    if(series.length>10&&i%Math.ceil(series.length/10)!==0&&i!==series.length-1)return;
+    ctx.fillText(s.day.slice(5),xi(i),c.height-14);
+  });
+  // 图例
+  ctx.textAlign='left';
+  ctx.fillStyle='#ffd6de';ctx.fillRect(P.l,4,12,12);
+  ctx.fillStyle='#a89696';ctx.fillText('每日总量',P.l+16,14);
+  ctx.fillStyle='#ff8fab';ctx.fillRect(P.l+86,8,14,3);
+  ctx.fillText('趋势',P.l+104,14);
+}
 $('#filterTag').onchange=renderTimeline;
 $('#filterKw').oninput=renderTimeline;
 
@@ -700,12 +843,12 @@ $('#btnBaby').onclick=()=>{
 // 备份
 $('#btnExport').onclick=async()=>{
   const pack=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)});
-  const es=await dbAll('entries'),gs=await dbAll('growth');
+  const es=await dbAll('entries'),gs=await dbAll('growth'),fs=await dbAll('feeds');
   for(const e of es){
     e.photos=await Promise.all((e.photos||[]).map(pack));
     e.videos=await Promise.all((e.videos||[]).map(pack));
   }
-  const data=JSON.stringify({v:1,baby,entries:es,growth:gs});
+  const data=JSON.stringify({v:2,baby,entries:es,growth:gs,feeds:fs});
   const blob=new Blob([data],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`宝宝相册备份-${new Date().toISOString().slice(0,10)}.json`;a.click();
@@ -725,6 +868,7 @@ $('#fImport').onchange=async e=>{
       await dbPut('entries',en);
     }
     for(const g of (data.growth||[])){g.id=g.id||uid();await dbPut('growth',g)}
+    for(const f of (data.feeds||[])){f.id=f.id||uid();await dbPut('feeds',f)}
     if(data.baby){baby=data.baby;localStorage.setItem('baby',JSON.stringify(baby))}
     await loadAll();alert('✅ 导入完成');
   }catch{alert('备份文件格式不正确')}
@@ -733,7 +877,7 @@ $('#fImport').onchange=async e=>{
 $('#btnWipe').onclick=async()=>{
   if(!confirm('确定清空所有数据吗？此操作不可恢复！'))return;
   if(!confirm('再次确认：照片将全部删除，建议先导出备份。'))return;
-  await dbClear('entries');await dbClear('growth');
+  await dbClear('entries');await dbClear('growth');await dbClear('feeds');
   localStorage.removeItem('baby');baby=null;await loadAll();alert('已清空');
 };
 function switchTab(t){document.querySelector(`nav [data-tab="${t}"]`).click()}
