@@ -54,7 +54,12 @@
     background:var(--primary);border:3px solid #fff;box-shadow:0 0 0 2px var(--primary)}
   .titem .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px}
   .titem .photos img{width:100%;border-radius:10px;cursor:zoom-in;aspect-ratio:1;object-fit:cover;transition:.2s}
+  .titem .photos video{width:100%;border-radius:10px;aspect-ratio:1;object-fit:cover;background:#000}
   .titem .photos img:hover{transform:scale(1.03)}
+  .thumbs div video{width:100%;height:100%;object-fit:cover;background:#000}
+  .vbadge{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;
+    font-size:10px;padding:1px 6px;border-radius:999px;pointer-events:none}
+  #viewer video{max-width:92vw;max-height:88vh;border-radius:8px}
   .date{font-size:.8rem;color:var(--muted);margin-bottom:4px}
   .tag{display:inline-block;background:#fff0f3;color:var(--primary-dark);font-size:.75rem;
     padding:2px 10px;border-radius:999px;margin-left:6px}
@@ -120,9 +125,9 @@
       </select>
       <label>描述</label>
       <textarea id="fDesc" rows="3" placeholder="记录下这一刻的故事…"></textarea>
-      <label>照片（可多选）</label>
-      <div class="drop" id="drop">点击选择照片，或把照片拖到这里 📷</div>
-      <input type="file" id="fPhotos" accept="image/*" multiple hidden>
+      <label>照片 / 视频（可多选）</label>
+      <div class="drop" id="drop">点击选择照片或视频，也可以拖到这里 📷🎬</div>
+      <input type="file" id="fPhotos" accept="image/*,video/*" multiple hidden>
       <div class="thumbs" id="thumbs"></div>
       <div class="actions">
         <button class="btn btn-primary" id="btnSave">💾 保存记录</button>
@@ -187,7 +192,7 @@
   </section>
 </main>
 <footer>数据仅存储在本设备浏览器（IndexedDB）中 · 可通过「设置 → 安装为应用」添加到主屏幕 · 清除浏览器数据前请先导出备份 💝</footer>
-<div id="viewer" class="hidden"><img id="viewerImg" alt=""></div>
+<div id="viewer" class="hidden"><img id="viewerImg" alt=""><video id="viewerVid" controls playsinline class="hidden"></video></div>
 
 <script>
 /* ================= IndexedDB ================= */
@@ -227,20 +232,28 @@ function calcAge(birth,date){
   return y+'岁'+m+'个月';
 }
 /* 图片压缩后转 blob 存储 */
-function compress(file,maxSide=1400,quality=.82){
+function compress(file,maxSide=1600,quality=.85){
   return new Promise(res=>{
     const img=new Image(),url=URL.createObjectURL(file);
+    let done=false;
+    const finish=b=>{if(done)return;done=true;URL.revokeObjectURL(url);res(b||file)};
     img.onload=()=>{
-      let{width:w,height:h}=img;
-      const sc=Math.min(1,maxSide/Math.max(w,h));w=Math.round(w*sc);h=Math.round(h*sc);
-      const c=document.createElement('canvas');c.width=w;c.height=h;
-      c.getContext('2d').drawImage(img,0,0,w,h);
-      c.toBlob(b=>{URL.revokeObjectURL(url);res(b)},'image/jpeg',quality);
+      try{
+        let{width:w,height:h}=img;
+        if(!w||!h){finish(file);return}
+        const sc=Math.min(1,maxSide/Math.max(w,h));w=Math.round(w*sc);h=Math.round(h*sc);
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        c.toBlob(b=>finish(b),'image/jpeg',quality);
+      }catch(err){finish(file)}
     };
-    img.onerror=()=>res(file);
+    img.onerror=()=>finish(file);
     img.src=url;
+    setTimeout(()=>finish(file),15000);
   });
 }
+/* 视频大小校验：超过 80MB 跳过（IndexedDB 存大文件易失败） */
+const VIDEO_MAX=80*1024*1024;
 
 /* ================= 状态 ================= */
 let baby=JSON.parse(localStorage.getItem('baby')||'null');
@@ -256,9 +269,11 @@ function renderHome(){
     $('#babyAge').textContent=baby.birth?`🎂 ${fmtDate(baby.birth)} · 已经 ${calcAge(baby.birth,today)}`:'生日未设置';
   }
   const nPhotos=entries.reduce((a,e)=>a+(e.photos||[]).length,0);
+  const nVideos=entries.reduce((a,e)=>a+(e.videos||[]).length,0);
   $('#stats').innerHTML=`
     <div class="stat"><b>${entries.length}</b><span>成长记录</span></div>
     <div class="stat"><b>${nPhotos}</b><span>照片</span></div>
+    <div class="stat"><b>${nVideos}</b><span>视频</span></div>
     <div class="stat"><b>${growthData.length}</b><span>生长数据</span></div>
     <div class="stat"><b>${entries.filter(e=>e.tag==='🎉 里程碑').length}</b><span>里程碑</span></div>`;
   const recent=[...entries].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
@@ -274,20 +289,29 @@ function renderTimeline(){
   if(kw)list=list.filter(e=>(e.title+' '+(e.desc||'')).toLowerCase().includes(kw));
   const tl=$('#timeline');
   if(!list.length){tl.innerHTML='<div class="empty"><span class="emoji">📷</span>暂无记录</div>';return}
-  tl.innerHTML=list.map(e=>`
+  tl.innerHTML=list.map(e=>{
+    const imgs=(e.photos||[]).map(p=>`<img src="${URL.createObjectURL(p)}" data-view alt="照片">`).join('');
+    const vids=(e.videos||[]).map(v=>`<video src="${URL.createObjectURL(v)}" controls playsinline preload="metadata"></video>`).join('');
+    const media=(imgs||vids)?`<div class="photos">${imgs}${vids}</div>`:'';
+    return `
     <div class="titem">
       <div class="date">${fmtDate(e.date)}<span class="tag">${e.tag}</span><span class="age-badge">${calcAge(baby&&baby.birth,e.date)}</span>
         <button class="btn-danger btn" style="float:right;padding:4px 10px;font-size:.75rem" data-del="${e.id}">删除</button></div>
       <h3 style="margin:4px 0">${e.title||''}</h3>
       ${e.desc?`<p style="font-size:.9rem;line-height:1.6">${e.desc}</p>`:''}
-      ${e.photos&&e.photos.length?`<div class="photos">${e.photos.map(p=>
-        `<img src="${URL.createObjectURL(p)}" data-view alt="照片">`).join('')}</div>`:''}
-    </div>`).join('');
+      ${media}
+    </div>`}).join('');
   tl.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
     if(confirm('确定删除这条记录吗？')){await dbDel('entries',b.dataset.del);await loadAll()}
   });
   tl.querySelectorAll('[data-view]').forEach(img=>img.onclick=()=>{
+    $('#viewerVid').classList.add('hidden');
+    $('#viewerImg').classList.remove('hidden');
     $('#viewerImg').src=img.src;$('#viewer').classList.remove('hidden');
+  });
+  tl.querySelectorAll('.photos video').forEach(v=>v.onclick=e=>{
+    // 直接点视频走原生控制条，不弹查看器
+    e.stopPropagation();
   });
 }
 function renderGrowth(){
@@ -352,34 +376,74 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   ['home','add','timeline','growth','settings'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
   if(b.dataset.tab==='timeline')renderTimeline();
 });
-// 照片选择
+// 照片/视频选择
 const drop=$('#drop'),fileInput=$('#fPhotos');
 drop.onclick=()=>fileInput.click();
 drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
 drop.ondragleave=()=>drop.classList.remove('over');
 drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');addFiles(e.dataTransfer.files)};
-fileInput.onchange=()=>{addFiles(fileInput.files);fileInput.value=''};
+fileInput.onchange=e=>{
+  // 关键：先把 FileList 复制成数组，再清空 input，避免部分安卓浏览器清空后读不到文件
+  const picked=Array.from(e.target.files||[]);
+  addFiles(picked);
+  fileInput.value='';
+};
 async function addFiles(files){
-  for(const f of files){
-    if(!f.type.startsWith('image/'))continue;
-    const blob=await compress(f);
-    pendingPhotos.push({name:f.name,blob});
+  const arr=Array.from(files||[]);
+  if(!arr.length)return;
+  drop.textContent='处理中…';
+  let ok=0,skipBig=0;
+  for(const f of arr){
+    const isImg=f.type.startsWith('image/');
+    const isVid=f.type.startsWith('video/');
+    if(!isImg&&!isVid)continue;
+    if(isVid){
+      if(f.size>VIDEO_MAX){skipBig++;continue}
+      pendingPhotos.push({name:f.name,type:'video',blob:f});
+      ok++;
+    }else{
+      const blob=await compress(f);
+      pendingPhotos.push({name:f.name,type:'image',blob:blob||f});
+      ok++;
+    }
+    renderThumbs();
   }
-  renderThumbs();
+  drop.textContent='点击选择照片或视频，也可以拖到这里 📷🎬';
+  if(skipBig)alert(`${skipBig} 个视频超过 80MB 已跳过，建议先在相册里压缩视频再上传`);
+  if(!ok&&!skipBig)alert('没有可用的照片或视频');
 }
 function renderThumbs(){
-  $('#thumbs').innerHTML=pendingPhotos.map((p,i)=>`
-    <div><img src="${URL.createObjectURL(p.blob)}"><button data-rm="${i}">✕</button></div>`).join('');
+  $('#thumbs').innerHTML=pendingPhotos.map((p,i)=>{
+    const url=URL.createObjectURL(p.blob);
+    return p.type==='video'
+      ? `<div><video src="${url}" muted playsinline></video><span class="vbadge">▶ 视频</span><button data-rm="${i}">✕</button></div>`
+      : `<div><img src="${url}"><button data-rm="${i}">✕</button></div>`;
+  }).join('');
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
     pendingPhotos.splice(+b.dataset.rm,1);renderThumbs()});
 }
 $('#btnSave').onclick=async()=>{
   const title=$('#fTitle').value.trim(),date=$('#fDate').value;
   if(!date){alert('请选择日期');return}
-  if(!title&&!pendingPhotos.length){alert('请填写标题或添加照片');return}
-  await dbPut('entries',{id:uid(),title,date,tag:$('#fTag').value,desc:$('#fDesc').value.trim(),photos:pendingPhotos.map(p=>p.blob)});
+  if(!title&&!pendingPhotos.length){alert('请填写标题或添加照片/视频');return}
+  if(pendingPhotos.length){
+    drop.textContent='保存中，请稍候…';
+  }
+  const photos=pendingPhotos.filter(p=>(p.type||'image')==='image').map(p=>p.blob);
+  const videos=pendingPhotos.filter(p=>p.type==='video').map(p=>p.blob);
+  const record={
+    id:uid(),title,date,tag:$('#fTag').value,desc:$('#fDesc').value.trim(),
+    photos,videos,
+    media:pendingPhotos.map(p=>({type:p.type||'image'}))
+  };
+  await dbPut('entries',record);
+  // 立即同步内存，保证保存后无需刷新即可看到
+  entries.push(record);
   pendingPhotos=[];$('#fTitle').value='';$('#fDesc').value='';renderThumbs();
-  alert('✅ 已保存！');switchTab('timeline');
+  drop.textContent='点击选择照片或视频，也可以拖到这里 📷🎬';
+  renderHome();renderTimeline();
+  alert(`✅ 已保存！共 ${photos.length} 张照片、${videos.length} 个视频`);
+  switchTab('timeline');
 };
 $('#btnReset').onclick=()=>{pendingPhotos=[];$('#fTitle').value='';$('#fDate').value='';$('#fDesc').value='';renderThumbs()};
 $('#btnGrowth').onclick=async()=>{
@@ -391,7 +455,10 @@ $('#btnGrowth').onclick=async()=>{
 };
 $('#filterTag').onchange=renderTimeline;
 $('#filterKw').oninput=renderTimeline;
-$('#viewer').onclick=()=>$('#viewer').classList.add('hidden');
+$('#viewer').onclick=e=>{
+  if(e.target.tagName==='VIDEO')return;
+  $('#viewer').classList.add('hidden');$('#viewerVid').pause();
+};
 // 设置
 $('#btnBaby').onclick=()=>{
   baby={name:$('#sName').value.trim(),birth:$('#sBirth').value,emoji:$('#sEmoji').value};
@@ -402,7 +469,10 @@ $('#btnBaby').onclick=()=>{
 $('#btnExport').onclick=async()=>{
   const pack=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)});
   const es=await dbAll('entries'),gs=await dbAll('growth');
-  for(const e of es){e.photos=await Promise.all((e.photos||[]).map(pack))}
+  for(const e of es){
+    e.photos=await Promise.all((e.photos||[]).map(pack));
+    e.videos=await Promise.all((e.videos||[]).map(pack));
+  }
   const data=JSON.stringify({v:1,baby,entries:es,growth:gs});
   const blob=new Blob([data],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -419,6 +489,7 @@ $('#fImport').onchange=async e=>{
     for(const en of data.entries){
       en.id=en.id||uid();
       en.photos=await Promise.all((en.photos||[]).map(unb64));
+      en.videos=await Promise.all((en.videos||[]).map(unb64));
       await dbPut('entries',en);
     }
     for(const g of (data.growth||[])){g.id=g.id||uid();await dbPut('growth',g)}
