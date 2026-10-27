@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宝宝成长相册</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ffb6c1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="宝宝相册">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#fdf6f0; --card:#ffffff; --primary:#ff8fab; --primary-dark:#f76a8c;
+    --text:#5b4a4a; --muted:#a89696; --accent:#ffd166; --shadow:0 4px 16px rgba(247,106,140,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  header{background:linear-gradient(135deg,#ffb6c1,#ffd166);padding:24px 16px;text-align:center;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.15);position:sticky;top:0;z-index:10;box-shadow:var(--shadow)}
+  header h1{font-size:1.6rem;letter-spacing:2px}
+  header p{font-size:.85rem;opacity:.9;margin-top:4px}
+  nav{display:flex;justify-content:center;gap:8px;margin:16px 8px 0;flex-wrap:wrap}
+  nav button{border:none;background:#fff;color:var(--text);padding:8px 18px;border-radius:999px;cursor:pointer;
+    font-size:.95rem;box-shadow:var(--shadow);transition:.2s}
+  nav button.active{background:var(--primary);color:#fff}
+  main{max-width:960px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+  .hidden{display:none!important}
+  h2{font-size:1.15rem;margin-bottom:12px;color:var(--primary-dark)}
+  label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+  input,textarea,select{width:100%;border:1px solid #f0dede;border-radius:10px;padding:10px;font-size:.95rem;
+    font-family:inherit;color:var(--text);background:#fffdfc}
+  input:focus,textarea:focus{outline:2px solid var(--primary);border-color:transparent}
+  .btn{display:inline-block;border:none;border-radius:12px;padding:11px 22px;font-size:1rem;cursor:pointer;transition:.2s}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-primary:hover{background:var(--primary-dark)}
+  .btn-ghost{background:#fff;color:var(--primary-dark);border:1px solid var(--primary)}
+  .btn-danger{background:#ffe5e5;color:#c0392b}
+  .drop{border:2px dashed var(--primary);border-radius:14px;padding:28px;text-align:center;color:var(--muted);
+    cursor:pointer;transition:.2s;background:#fffafa}
+  .drop:hover,.drop.over{background:#fff0f3}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:12px}
+  .thumbs div{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1}
+  .thumbs img{width:100%;height:100%;object-fit:cover}
+  .thumbs button{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);color:#fff;border:none;
+    border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:1}
+  .timeline{position:relative;padding-left:20px}
+  .timeline::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:3px;background:#ffd6de;border-radius:2px}
+  .titem{position:relative;margin-bottom:20px}
+  .titem::before{content:"";position:absolute;left:-21px;top:18px;width:13px;height:13px;border-radius:50%;
+    background:var(--primary);border:3px solid #fff;box-shadow:0 0 0 2px var(--primary)}
+  .titem .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px}
+  .titem .photos img{width:100%;border-radius:10px;cursor:zoom-in;aspect-ratio:1;object-fit:cover;transition:.2s}
+  .titem .photos img:hover{transform:scale(1.03)}
+  .date{font-size:.8rem;color:var(--muted);margin-bottom:4px}
+  .tag{display:inline-block;background:#fff0f3;color:var(--primary-dark);font-size:.75rem;
+    padding:2px 10px;border-radius:999px;margin-left:6px}
+  .age-badge{display:inline-block;background:var(--accent);color:#7a5c00;font-size:.75rem;
+    padding:2px 10px;border-radius:999px;margin-left:6px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+  .stat{background:#fff;border-radius:14px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+  .stat b{display:block;font-size:1.3rem;color:var(--primary-dark)}
+  .stat span{font-size:.78rem;color:var(--muted)}
+  #viewer{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;
+    z-index:100;cursor:zoom-out}
+  #viewer img{max-width:92vw;max-height:88vh;border-radius:8px}
+  .empty{text-align:center;color:var(--muted);padding:50px 0}
+  .empty .emoji{font-size:3rem;display:block;margin-bottom:10px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .row>div{flex:1;min-width:140px}
+  .actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  footer{text-align:center;color:var(--muted);font-size:.78rem;padding:20px 10px 30px}
+  .record{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px dashed #f5e3e6;font-size:.92rem}
+  .record b{color:var(--primary-dark)}
+  @media(max-width:600px){header h1{font-size:1.25rem}}
+</style>
+</head>
+<body>
+<header>
+  <h1>👶 宝宝成长相册</h1>
+  <p id="headerSub">所有数据仅保存在本设备浏览器中，安全私密</p>
+</header>
+<nav>
+  <button class="active" data-tab="home">🏠 首页</button>
+  <button data-tab="add">➕ 添加记录</button>
+  <button data-tab="timeline">📷 时间轴</button>
+  <button data-tab="growth">📈 成长曲线</button>
+  <button data-tab="settings">⚙️ 设置</button>
+</nav>
+<main>
+  <!-- 首页 -->
+  <section id="tab-home">
+    <div class="card" id="babyCard" style="text-align:center">
+      <div style="font-size:4rem" id="babyEmoji">🍼</div>
+      <h2 id="babyName" style="color:var(--text)">还没有宝宝信息</h2>
+      <p id="babyAge" style="color:var(--muted);margin-top:6px">去「设置」填写宝宝信息吧</p>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="card">
+      <h2>最近记录</h2>
+      <div id="recentList"></div>
+    </div>
+  </section>
+
+  <!-- 添加记录 -->
+  <section id="tab-add" class="hidden">
+    <div class="card">
+      <h2>添加成长记录</h2>
+      <label>标题 *</label>
+      <input id="fTitle" placeholder="例如：第一次翻身 / 百日照">
+      <label>日期 *</label>
+      <input id="fDate" type="date">
+      <label>分类</label>
+      <select id="fTag">
+        <option>📷 照片</option><option>🎉 里程碑</option><option>🏥 健康</option>
+        <option>🎈 有趣瞬间</option><option>🎂 节日生日</option><option>✏️ 其他</option>
+      </select>
+      <label>描述</label>
+      <textarea id="fDesc" rows="3" placeholder="记录下这一刻的故事…"></textarea>
+      <label>照片（可多选）</label>
+      <div class="drop" id="drop">点击选择照片，或把照片拖到这里 📷</div>
+      <input type="file" id="fPhotos" accept="image/*" multiple hidden>
+      <div class="thumbs" id="thumbs"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="btnSave">💾 保存记录</button>
+        <button class="btn btn-ghost" id="btnReset">清空</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>快速记录身高体重</h2>
+      <div class="row">
+        <div><label>日期</label><input id="gDate" type="date"></div>
+        <div><label>身高 (cm)</label><input id="gHeight" type="number" step="0.1" placeholder="如 68.5"></div>
+        <div><label>体重 (kg)</label><input id="gWeight" type="number" step="0.1" placeholder="如 7.2"></div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" id="btnGrowth">保存生长数据</button></div>
+    </div>
+  </section>
+
+  <!-- 时间轴 -->
+  <section id="tab-timeline" class="hidden">
+    <div class="card">
+      <div class="row">
+        <div><label>筛选分类</label><select id="filterTag"><option value="">全部</option></select></div>
+        <div><label>搜索关键词</label><input id="filterKw" placeholder="标题或描述"></div>
+      </div>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </section>
+
+  <!-- 成长曲线 -->
+  <section id="tab-growth" class="hidden">
+    <div class="card">
+      <h2>身高体重记录</h2>
+      <div id="growthList"></div>
+      <canvas id="chart" width="880" height="360" style="width:100%;margin-top:14px"></canvas>
+    </div>
+  </section>
+
+  <!-- 设置 -->
+  <section id="tab-settings" class="hidden">
+    <div class="card">
+      <h2>宝宝信息</h2>
+      <label>小名 / 姓名</label><input id="sName" placeholder="宝宝的小名">
+      <label>生日</label><input id="sBirth" type="date">
+      <label>头像 emoji</label>
+      <select id="sEmoji">
+        <option>👶</option><option>👦</option><option>👧</option><option>🍼</option>
+        <option>🐻</option><option>🐰</option><option>🌟</option><option>🚀</option>
+      </select>
+      <div class="actions"><button class="btn btn-primary" id="btnBaby">保存宝宝信息</button></div>
+    </div>
+    <div class="card">
+      <h2>数据备份与恢复</h2>
+      <p style="font-size:.88rem;color:var(--muted)">导出会生成一个备份文件（含照片），请妥善保存。导入备份可恢复全部数据。</p>
+      <div class="actions">
+        <button class="btn btn-ghost" id="btnExport">⬇️ 导出备份</button>
+        <button class="btn btn-ghost" id="btnImport">⬆️ 导入备份</button>
+        <button class="btn btn-ghost" id="btnInstall" hidden>📲 安装为应用</button>
+        <button class="btn btn-danger" id="btnWipe">🗑️ 清空所有数据</button>
+      </div>
+      <input type="file" id="fImport" accept=".json" hidden>
+    </div>
+  </section>
+</main>
+<footer>数据仅存储在本设备浏览器（IndexedDB）中 · 可通过「设置 → 安装为应用」添加到主屏幕 · 清除浏览器数据前请先导出备份 💝</footer>
+<div id="viewer" class="hidden"><img id="viewerImg" alt=""></div>
+
+<script>
+/* ================= IndexedDB ================= */
+const DB_NAME='babyAlbum', DB_VER=1;
+let db;
+function openDB(){return new Promise((res,rej)=>{
+  const r=indexedDB.open(DB_NAME,DB_VER);
+  r.onupgradeneeded=e=>{
+    const d=e.target.result;
+    if(!d.objectStoreNames.contains('entries'))d.createObjectStore('entries',{keyPath:'id'});
+    if(!d.objectStoreNames.contains('growth'))d.createObjectStore('growth',{keyPath:'id'});
+    if(!d.objectStoreNames.contains('meta'))d.createObjectStore('meta',{keyPath:'key'});
+  };
+  r.onsuccess=e=>{db=e.target.result;res(db)};
+  r.onerror=()=>rej(r.error);
+});}
+function tx(store,mode,fn){return new Promise((res,rej)=>{
+  const t=db.transaction(store,mode),s=t.objectStore(store),rq=fn(s);
+  t.oncomplete=()=>res(rq&&rq.result);t.onerror=()=>rej(t.error);
+});}
+const dbAll=s=>tx(s,'readonly',o=>o.getAll());
+const dbPut=(s,v)=>tx(s,'readwrite',o=>o.put(v));
+const dbDel=(s,k)=>tx(s,'readwrite',o=>o.delete(k));
+const dbClear=s=>tx(s,'readwrite',o=>o.clear());
+
+/* ================= 工具 ================= */
+const $=s=>document.querySelector(s);
+const uid=()=>Date.now()+''+Math.random().toString(36).slice(2,7);
+const fmtDate=d=>{const x=new Date(d+'T00:00:00');return `${x.getFullYear()}年${x.getMonth()+1}月${x.getDate()}日`};
+function calcAge(birth,date){
+  if(!birth)return '';
+  const b=new Date(birth+'T00:00:00'),d=new Date(date+'T00:00:00');
+  let days=Math.floor((d-b)/864e5); if(days<0)return '';
+  const y=Math.floor(days/365),m=Math.floor((days%365)/30),dd=days%30;
+  if(days<31)return days+'天';
+  if(y<1)return (m||1)+'个月'+(dd?dd+'天':'');
+  return y+'岁'+m+'个月';
+}
+/* 图片压缩后转 blob 存储 */
+function compress(file,maxSide=1400,quality=.82){
+  return new Promise(res=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      let{width:w,height:h}=img;
+      const sc=Math.min(1,maxSide/Math.max(w,h));w=Math.round(w*sc);h=Math.round(h*sc);
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      c.toBlob(b=>{URL.revokeObjectURL(url);res(b)},'image/jpeg',quality);
+    };
+    img.onerror=()=>res(file);
+    img.src=url;
+  });
+}
+
+/* ================= 状态 ================= */
+let baby=JSON.parse(localStorage.getItem('baby')||'null');
+let pendingPhotos=[]; // {name, blob}
+let entries=[], growthData=[];
+
+/* ================= 渲染 ================= */
+function renderHome(){
+  if(baby){
+    $('#babyEmoji').textContent=baby.emoji||'👶';
+    $('#babyName').textContent=baby.name||'我家宝宝';
+    const today=new Date().toISOString().slice(0,10);
+    $('#babyAge').textContent=baby.birth?`🎂 ${fmtDate(baby.birth)} · 已经 ${calcAge(baby.birth,today)}`:'生日未设置';
+  }
+  const nPhotos=entries.reduce((a,e)=>a+(e.photos||[]).length,0);
+  $('#stats').innerHTML=`
+    <div class="stat"><b>${entries.length}</b><span>成长记录</span></div>
+    <div class="stat"><b>${nPhotos}</b><span>照片</span></div>
+    <div class="stat"><b>${growthData.length}</b><span>生长数据</span></div>
+    <div class="stat"><b>${entries.filter(e=>e.tag==='🎉 里程碑').length}</b><span>里程碑</span></div>`;
+  const recent=[...entries].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  $('#recentList').innerHTML=recent.length?recent.map(e=>`
+    <div class="record"><span>${e.tag} ${e.title||'(无标题)'}<span class="age-badge">${calcAge(baby&&baby.birth,e.date)}</span></span>
+    <b>${e.date}</b></div>`).join('')
+    :'<div class="empty"><span class="emoji">🌱</span>还没有记录，去添加第一条吧！</div>';
+}
+function renderTimeline(){
+  const tag=$('#filterTag').value, kw=$('#filterKw').value.trim().toLowerCase();
+  let list=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
+  if(tag)list=list.filter(e=>e.tag===tag);
+  if(kw)list=list.filter(e=>(e.title+' '+(e.desc||'')).toLowerCase().includes(kw));
+  const tl=$('#timeline');
+  if(!list.length){tl.innerHTML='<div class="empty"><span class="emoji">📷</span>暂无记录</div>';return}
+  tl.innerHTML=list.map(e=>`
+    <div class="titem">
+      <div class="date">${fmtDate(e.date)}<span class="tag">${e.tag}</span><span class="age-badge">${calcAge(baby&&baby.birth,e.date)}</span>
+        <button class="btn-danger btn" style="float:right;padding:4px 10px;font-size:.75rem" data-del="${e.id}">删除</button></div>
+      <h3 style="margin:4px 0">${e.title||''}</h3>
+      ${e.desc?`<p style="font-size:.9rem;line-height:1.6">${e.desc}</p>`:''}
+      ${e.photos&&e.photos.length?`<div class="photos">${e.photos.map(p=>
+        `<img src="${URL.createObjectURL(p)}" data-view alt="照片">`).join('')}</div>`:''}
+    </div>`).join('');
+  tl.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    if(confirm('确定删除这条记录吗？')){await dbDel('entries',b.dataset.del);await loadAll()}
+  });
+  tl.querySelectorAll('[data-view]').forEach(img=>img.onclick=()=>{
+    $('#viewerImg').src=img.src;$('#viewer').classList.remove('hidden');
+  });
+}
+function renderGrowth(){
+  const list=[...growthData].sort((a,b)=>a.date.localeCompare(b.date));
+  $('#growthList').innerHTML=list.length?list.map(e=>`
+    <div class="record"><span>${fmtDate(e.date)}<span class="age-badge">${calcAge(baby&&baby.birth,e.date)}</span></span>
+    <span><b>${e.height?e.height+' cm':''}</b>${e.height&&e.weight?' · ':''}<b>${e.weight?e.weight+' kg':''}</b>
+    <button class="btn-danger btn" style="padding:2px 8px;font-size:.7rem;margin-left:8px" data-gdel="${e.id}">删</button></span></div>`).join('')
+    :'<div class="empty"><span class="emoji">📏</span>还没有身高体重数据</div>';
+  document.querySelectorAll('[data-gdel]').forEach(b=>b.onclick=async()=>{
+    await dbDel('growth',b.dataset.gdel);await loadAll();
+  });
+  drawChart(list);
+}
+function drawChart(list){
+  const c=$('#chart'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  if(list.length<2){ctx.fillStyle='#a89696';ctx.font='16px sans-serif';
+    ctx.textAlign='center';ctx.fillText('至少需要两条数据才能绘制曲线',c.width/2,c.height/2);return}
+  const P={l:56,r:16,t:20,b:40};
+  const hs=list.filter(x=>x.height),ws=list.filter(x=>x.weight);
+  const series=[];
+  if(hs.length>1)series.push({data:hs,key:'height',color:'#f76a8c',label:'身高 cm'});
+  if(ws.length>1)series.push({data:ws,key:'weight',color:'#4d96ff',label:'体重 kg',axis:1});
+  const dates=[...new Set(list.map(x=>x.date))].sort();
+  const xi=d=>P.l+(c.width-P.l-P.r)*(dates.indexOf(d)/(dates.length-1));
+  const yMax=k=>Math.max(...list.map(x=>x[k]||0))*1.1;
+  const draw=(s,ax)=>{
+    const max=s.axis?yMax(s.key):Math.max(yMax('height'),yMax('weight'));
+    const y=v=>c.height-P.b-(c.height-P.t-P.b)*(v/max);
+    ctx.strokeStyle=s.color;ctx.lineWidth=2.5;ctx.beginPath();
+    s.data.forEach((p,i)=>{const x=xi(p.date);i?ctx.lineTo(x,y(p[s.key])):ctx.moveTo(x,y(p[s.key]))});
+    ctx.stroke();
+    ctx.fillStyle=s.color;
+    s.data.forEach(p=>{const x=xi(p.date);ctx.beginPath();ctx.arc(x,y(p[s.key]),4,0,7);ctx.fill()});
+    // 轴标签
+    ctx.font='12px sans-serif';ctx.textAlign='right';
+    for(let i=1;i<=4;i++){const v=max*i/4;ctx.fillText(v.toFixed(s.key==='weight'?1:0),P.l-8,y(v));}
+  };
+  series.forEach(draw);
+  // 日期轴
+  ctx.fillStyle='#a89696';ctx.textAlign='center';
+  dates.forEach((d,i)=>{ if(dates.length>8&&i%Math.ceil(dates.length/8)!==0)return;
+    ctx.fillText(d.slice(5),xi(d),c.height-14);});
+  // 图例
+  let lx=P.l;ctx.textAlign='left';
+  series.forEach(s=>{ctx.fillStyle=s.color;ctx.fillRect(lx,4,14,4);ctx.fillText(s.label,lx+18,12);lx+=ctx.measureText(s.label).width+50;});
+}
+function renderTags(){
+  const tags=['📷 照片','🎉 里程碑','🏥 健康','🎈 有趣瞬间','🎂 节日生日','✏️ 其他'];
+  $('#filterTag').innerHTML='<option value="">全部</option>'+tags.map(t=>`<option>${t}</option>`).join('');
+}
+async function loadAll(){
+  entries=await dbAll('entries');growthData=await dbAll('growth');
+  renderHome();renderTimeline();renderGrowth();
+}
+
+/* ================= 交互 ================= */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  ['home','add','timeline','growth','settings'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
+  if(b.dataset.tab==='timeline')renderTimeline();
+});
+// 照片选择
+const drop=$('#drop'),fileInput=$('#fPhotos');
+drop.onclick=()=>fileInput.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');addFiles(e.dataTransfer.files)};
+fileInput.onchange=()=>{addFiles(fileInput.files);fileInput.value=''};
+async function addFiles(files){
+  for(const f of files){
+    if(!f.type.startsWith('image/'))continue;
+    const blob=await compress(f);
+    pendingPhotos.push({name:f.name,blob});
+  }
+  renderThumbs();
+}
+function renderThumbs(){
+  $('#thumbs').innerHTML=pendingPhotos.map((p,i)=>`
+    <div><img src="${URL.createObjectURL(p.blob)}"><button data-rm="${i}">✕</button></div>`).join('');
+  document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
+    pendingPhotos.splice(+b.dataset.rm,1);renderThumbs()});
+}
+$('#btnSave').onclick=async()=>{
+  const title=$('#fTitle').value.trim(),date=$('#fDate').value;
+  if(!date){alert('请选择日期');return}
+  if(!title&&!pendingPhotos.length){alert('请填写标题或添加照片');return}
+  await dbPut('entries',{id:uid(),title,date,tag:$('#fTag').value,desc:$('#fDesc').value.trim(),photos:pendingPhotos.map(p=>p.blob)});
+  pendingPhotos=[];$('#fTitle').value='';$('#fDesc').value='';renderThumbs();
+  alert('✅ 已保存！');switchTab('timeline');
+};
+$('#btnReset').onclick=()=>{pendingPhotos=[];$('#fTitle').value='';$('#fDate').value='';$('#fDesc').value='';renderThumbs()};
+$('#btnGrowth').onclick=async()=>{
+  const date=$('#gDate').value,h=parseFloat($('#gHeight').value),w=parseFloat($('#gWeight').value);
+  if(!date||(isNaN(h)&&isNaN(w))){alert('请填写日期和至少一项数据');return}
+  await dbPut('growth',{id:uid(),date,height:isNaN(h)?null:h,weight:isNaN(w)?null:w});
+  $('#gHeight').value='';$('#gWeight').value='';
+  alert('✅ 已保存生长数据');loadAll();
+};
+$('#filterTag').onchange=renderTimeline;
+$('#filterKw').oninput=renderTimeline;
+$('#viewer').onclick=()=>$('#viewer').classList.add('hidden');
+// 设置
+$('#btnBaby').onclick=()=>{
+  baby={name:$('#sName').value.trim(),birth:$('#sBirth').value,emoji:$('#sEmoji').value};
+  localStorage.setItem('baby',JSON.stringify(baby));
+  renderHome();alert('✅ 宝宝信息已保存');
+};
+// 备份
+$('#btnExport').onclick=async()=>{
+  const pack=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)});
+  const es=await dbAll('entries'),gs=await dbAll('growth');
+  for(const e of es){e.photos=await Promise.all((e.photos||[]).map(pack))}
+  const data=JSON.stringify({v:1,baby,entries:es,growth:gs});
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`宝宝相册备份-${new Date().toISOString().slice(0,10)}.json`;a.click();
+};
+$('#btnImport').onclick=()=>$('#fImport').click();
+$('#fImport').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(!data.entries)throw 0;
+    if(!confirm('导入将合并到现有数据中，继续吗？'))return;
+    const unb64=s=>fetch(s).then(r=>r.blob());
+    for(const en of data.entries){
+      en.id=en.id||uid();
+      en.photos=await Promise.all((en.photos||[]).map(unb64));
+      await dbPut('entries',en);
+    }
+    for(const g of (data.growth||[])){g.id=g.id||uid();await dbPut('growth',g)}
+    if(data.baby){baby=data.baby;localStorage.setItem('baby',JSON.stringify(baby))}
+    await loadAll();alert('✅ 导入完成');
+  }catch{alert('备份文件格式不正确')}
+  e.target.value='';
+};
+$('#btnWipe').onclick=async()=>{
+  if(!confirm('确定清空所有数据吗？此操作不可恢复！'))return;
+  if(!confirm('再次确认：照片将全部删除，建议先导出备份。'))return;
+  await dbClear('entries');await dbClear('growth');
+  localStorage.removeItem('baby');baby=null;await loadAll();alert('已清空');
+};
+function switchTab(t){document.querySelector(`nav [data-tab="${t}"]`).click()}
+// 默认日期
+const today=new Date().toISOString().slice(0,10);
+$('#fDate').value=today;$('#gDate').value=today;
+
+/* ================= PWA ================= */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;$('#btnInstall').hidden=false;
+});
+$('#btnInstall').onclick=async()=>{
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  const{outcome}=await deferredPrompt.userChoice;
+  if(outcome==='accepted'){$('#btnInstall').hidden=true;alert('已安装！可以在主屏幕找到「宝宝相册」了 🎉')}
+  deferredPrompt=null;
+};
+window.addEventListener('appinstalled',()=>{$('#btnInstall').hidden=true});
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+/* ================= 启动 ================= */
+(async()=>{
+  await openDB();
+  if(baby){$('#sName').value=baby.name||'';$('#sBirth').value=baby.birth||'';$('#sEmoji').value=baby.emoji||'👶'}
+  renderTags();await loadAll();
+})();
+</script>
+</body>
+</html>
