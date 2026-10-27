@@ -22,11 +22,14 @@
     text-shadow:0 1px 3px rgba(0,0,0,.15);position:sticky;top:0;z-index:10;box-shadow:var(--shadow)}
   header h1{font-size:1.6rem;letter-spacing:2px}
   header p{font-size:.85rem;opacity:.9;margin-top:4px}
-  nav{display:flex;justify-content:center;gap:8px;margin:16px 8px 0;flex-wrap:wrap}
-  nav button{border:none;background:#fff;color:var(--text);padding:8px 18px;border-radius:999px;cursor:pointer;
-    font-size:.95rem;box-shadow:var(--shadow);transition:.2s}
-  nav button.active{background:var(--primary);color:#fff}
-  main{max-width:960px;margin:0 auto;padding:16px}
+  nav{position:fixed;bottom:0;left:0;right:0;z-index:50;display:flex;gap:2px;
+    background:#fff;border-top:1px solid #f3e0e4;padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+    box-shadow:0 -2px 12px rgba(247,106,140,.10)}
+  nav button{flex:1;border:none;background:transparent;color:var(--muted);padding:6px 2px;border-radius:12px;
+    cursor:pointer;font-size:.72rem;transition:.2s;display:flex;flex-direction:column;align-items:center;gap:2px}
+  nav button span.ic{font-size:1.25rem;line-height:1}
+  nav button.active{background:#fff0f3;color:var(--primary-dark)}
+  main{max-width:960px;margin:0 auto;padding:16px 16px 86px}
   .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
   .hidden{display:none!important}
   h2{font-size:1.15rem;margin-bottom:12px;color:var(--primary-dark)}
@@ -120,11 +123,11 @@
   <p id="headerSub">所有数据仅保存在本设备浏览器中，安全私密</p>
 </header>
 <nav>
-  <button class="active" data-tab="home">🏠 首页</button>
-  <button data-tab="add">➕ 添加记录</button>
-  <button data-tab="timeline">📷 时间轴</button>
-  <button data-tab="growth">📈 成长曲线</button>
-  <button data-tab="settings">⚙️ 设置</button>
+  <button class="active" data-tab="home"><span class="ic">🏠</span>首页</button>
+  <button data-tab="add"><span class="ic">➕</span>添加</button>
+  <button data-tab="timeline"><span class="ic">📷</span>时间轴</button>
+  <button data-tab="growth"><span class="ic">📈</span>成长曲线</button>
+  <button data-tab="settings"><span class="ic">⚙️</span>设置</button>
 </nav>
 <main>
   <!-- 首页 -->
