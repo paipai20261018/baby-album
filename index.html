@@ -59,6 +59,37 @@
   .thumbs div video{width:100%;height:100%;object-fit:cover;background:#000}
   .vbadge{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;
     font-size:10px;padding:1px 6px;border-radius:999px;pointer-events:none}
+  /* 媒体单元格控制 */
+  .mcell{position:relative}
+  .mcell .idx{position:absolute;top:4px;left:4px;background:rgba(0,0,0,.55);color:#fff;
+    font-size:10px;width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;z-index:2}
+  .mctrl{position:absolute;bottom:4px;left:4px;right:4px;display:flex;gap:3px;justify-content:center;z-index:3}
+  .mctrl button{background:rgba(255,255,255,.92);border:none;border-radius:6px;color:#f76a8c;
+    font-size:11px;padding:3px 0;flex:1;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .mctrl button:hover{background:#fff}
+  .datebtns{display:inline-flex;gap:6px;float:right}
+  .edit-btn{padding:4px 10px;font-size:.75rem;background:#fff;border:1px solid #ff8fab;color:#f76a8c;border-radius:8px}
+  .rowmove{display:inline-flex;gap:6px;margin-left:8px}
+  .rowmove button{border:none;background:#fff0f3;color:#f76a8c;border-radius:8px;
+    padding:3px 8px;font-size:.72rem;cursor:pointer}
+  .rowmove button:disabled{opacity:.35;cursor:not-allowed}
+  .titem.editing{outline:2px dashed #ff8fab;outline-offset:6px;border-radius:8px}
+  .notice{background:#fff8e1;color:#8a6d00;font-size:.85rem;padding:10px;border-radius:10px;margin-bottom:12px}
+  /* 编辑弹窗 */
+  #editor{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;
+    align-items:flex-end;justify-content:center}
+  #editor .panel{background:#fff;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;
+    border-radius:20px 20px 0 0;padding:20px 18px 26px;animation:slideUp .22s ease}
+  @keyframes slideUp{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+  #editor h3{color:var(--primary-dark);margin-bottom:6px;font-size:1.1rem}
+  .ed-media{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-top:8px}
+  .ed-media .em{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#f5f5f5}
+  .ed-media img,.ed-media video{width:100%;height:100%;object-fit:cover}
+  .ed-media .em button{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;
+    border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1}
+  .ed-media .em .mv{position:absolute;bottom:3px;display:flex;gap:3px;left:3px;right:3px}
+  .ed-media .em .mv button{position:static;flex:1;border-radius:5px;width:auto;height:18px;
+    background:rgba(255,255,255,.9);color:#f76a8c;font-size:10px}
   #viewer video{max-width:92vw;max-height:88vh;border-radius:8px}
   .date{font-size:.8rem;color:var(--muted);margin-bottom:4px}
   .tag{display:inline-block;background:#fff0f3;color:var(--primary-dark);font-size:.75rem;
@@ -152,6 +183,10 @@
         <div><label>筛选分类</label><select id="filterTag"><option value="">全部</option></select></div>
         <div><label>搜索关键词</label><input id="filterKw" placeholder="标题或描述"></div>
       </div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn btn-ghost" id="btnReorder" style="padding:8px 16px;font-size:.88rem">↕️ 调整记录顺序</button>
+        <button class="btn btn-ghost" id="btnResetOrder" style="padding:8px 16px;font-size:.88rem" hidden>恢复按日期排序</button>
+      </div>
     </div>
     <div class="timeline" id="timeline"></div>
   </section>
@@ -193,6 +228,31 @@
 </main>
 <footer>数据仅存储在本设备浏览器（IndexedDB）中 · 可通过「设置 → 安装为应用」添加到主屏幕 · 清除浏览器数据前请先导出备份 💝</footer>
 <div id="viewer" class="hidden"><img id="viewerImg" alt=""><video id="viewerVid" controls playsinline class="hidden"></video></div>
+
+<!-- 编辑记录弹窗 -->
+<div id="editor" class="hidden">
+  <div class="panel">
+    <h3>✏️ 编辑记录</h3>
+    <label>标题</label>
+    <input id="eTitle" placeholder="记录标题">
+    <label>日期</label>
+    <input id="eDate" type="date">
+    <label>分类</label>
+    <select id="eTag"></select>
+    <label>描述</label>
+    <textarea id="eDesc" rows="3" placeholder="记录这一刻…"></textarea>
+    <label>照片 / 视频（可删除、调顺序、继续添加）</label>
+    <div class="ed-media" id="eMedia"></div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn btn-ghost" id="eAddBtn" style="padding:8px 16px;font-size:.9rem">＋ 添加媒体</button>
+      <input type="file" id="eAddFile" accept="image/*,video/*" multiple hidden>
+    </div>
+    <div class="actions" style="margin-top:16px">
+      <button class="btn btn-primary" id="eSave" style="flex:1">💾 保存修改</button>
+      <button class="btn btn-ghost" id="eCancel">取消</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ================= IndexedDB ================= */
@@ -276,42 +336,117 @@ function renderHome(){
     <div class="stat"><b>${nVideos}</b><span>视频</span></div>
     <div class="stat"><b>${growthData.length}</b><span>生长数据</span></div>
     <div class="stat"><b>${entries.filter(e=>e.tag==='🎉 里程碑').length}</b><span>里程碑</span></div>`;
-  const recent=[...entries].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  const recent=sortEntries(entries).slice(0,5);
   $('#recentList').innerHTML=recent.length?recent.map(e=>`
     <div class="record"><span>${e.tag} ${e.title||'(无标题)'}<span class="age-badge">${calcAge(baby&&baby.birth,e.date)}</span></span>
     <b>${e.date}</b></div>`).join('')
     :'<div class="empty"><span class="emoji">🌱</span>还没有记录，去添加第一条吧！</div>';
 }
+/* 统一取出一条记录的有序媒体列表 [{type:'image'|'video', blob}] */
+function getMedia(entry){
+  if(Array.isArray(entry.media)&&entry.media.length&&entry.media[0]&&entry.media[0].blob!==undefined)
+    return entry.media;
+  // 兼容旧数据：photos / videos 分开存
+  const out=[];
+  (entry.photos||[]).forEach(b=>out.push({type:'image',blob:b}));
+  (entry.videos||[]).forEach(b=>out.push({type:'video',blob:b}));
+  return out;
+}
+/* 记录排序：有 sortOrder 用手动顺序，否则按日期倒序 */
+function sortEntries(list){
+  return list.slice().sort((a,b)=>{
+    const ao=(a.sortOrder===undefined||a.sortOrder===null)?null:a.sortOrder;
+    const bo=(b.sortOrder===undefined||b.sortOrder===null)?null:b.sortOrder;
+    if(ao!==null&&bo!==null&&ao!==bo)return ao-bo;
+    if(ao!==null&&bo===null)return -1;
+    if(ao===null&&bo!==null)return 1;
+    return b.date.localeCompare(a.date);
+  });
+}
+let reorderMode=false; // 时间轴手动排序模式
+
 function renderTimeline(){
   const tag=$('#filterTag').value, kw=$('#filterKw').value.trim().toLowerCase();
-  let list=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
+  let list=sortEntries(entries);
   if(tag)list=list.filter(e=>e.tag===tag);
   if(kw)list=list.filter(e=>(e.title+' '+(e.desc||'')).toLowerCase().includes(kw));
   const tl=$('#timeline');
   if(!list.length){tl.innerHTML='<div class="empty"><span class="emoji">📷</span>暂无记录</div>';return}
-  tl.innerHTML=list.map(e=>{
-    const imgs=(e.photos||[]).map(p=>`<img src="${URL.createObjectURL(p)}" data-view alt="照片">`).join('');
-    const vids=(e.videos||[]).map(v=>`<video src="${URL.createObjectURL(v)}" controls playsinline preload="metadata"></video>`).join('');
-    const media=(imgs||vids)?`<div class="photos">${imgs}${vids}</div>`:'';
+  const filtered=!!(tag||kw); // 有筛选时禁用排序，避免歧义
+  tl.innerHTML=list.map((e,idx)=>{
+    const media=getMedia(e);
+    const cells=media.map((m,i)=>{
+      const url=URL.createObjectURL(m.blob);
+      const ctrl=`<span class="mctrl">
+          ${i>0?`<button data-mv="up" data-id="${e.id}" data-i="${i}" title="前移">◀</button>`:''}
+          ${i<media.length-1?`<button data-mv="down" data-id="${e.id}" data-i="${i}" title="后移">▶</button>`:''}
+          <button data-md="${e.id}" data-i="${i}" title="删除此媒体">✕</button>
+        </span>`;
+      return m.type==='video'
+        ? `<div class="mcell"><span class="idx">${i+1}</span><video src="${url}" controls playsinline preload="metadata"></video>${ctrl}</div>`
+        : `<div class="mcell"><span class="idx">${i+1}</span><img src="${url}" data-view alt="照片">${ctrl}</div>`;
+    }).join('');
+    const rowBtns=reorderMode&&!filtered?`
+      <div class="rowmove">
+        <button data-row="up" data-id="${e.id}" ${idx===0?'disabled':''}>▲ 上移</button>
+        <button data-row="down" data-id="${e.id}" ${idx===list.length-1?'disabled':''}>▼ 下移</button>
+      </div>`:'';
     return `
-    <div class="titem">
+    <div class="titem ${reorderMode&&!filtered?'editing':''}">
       <div class="date">${fmtDate(e.date)}<span class="tag">${e.tag}</span><span class="age-badge">${calcAge(baby&&baby.birth,e.date)}</span>
-        <button class="btn-danger btn" style="float:right;padding:4px 10px;font-size:.75rem" data-del="${e.id}">删除</button></div>
+        ${rowBtns}
+        <span class="datebtns">
+          <button class="btn edit-btn" data-edit="${e.id}">✏️ 编辑</button>
+          <button class="btn-danger btn" style="padding:4px 10px;font-size:.75rem" data-del="${e.id}">删除</button>
+        </span></div>
       <h3 style="margin:4px 0">${e.title||''}</h3>
       ${e.desc?`<p style="font-size:.9rem;line-height:1.6">${e.desc}</p>`:''}
-      ${media}
+      ${media.length?`<div class="photos ${reorderMode?'sortable':''}">${cells}</div>`:''}
     </div>`}).join('');
+  if(reorderMode&&filtered)tl.insertAdjacentHTML('afterbegin',
+    '<div class="notice">💡 排序模式下请先清空上方筛选条件</div>');
+
+  /* ---- 事件绑定 ---- */
   tl.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
     if(confirm('确定删除这条记录吗？')){await dbDel('entries',b.dataset.del);await loadAll()}
   });
+  tl.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(b.dataset.edit));
   tl.querySelectorAll('[data-view]').forEach(img=>img.onclick=()=>{
     $('#viewerVid').classList.add('hidden');
     $('#viewerImg').classList.remove('hidden');
     $('#viewerImg').src=img.src;$('#viewer').classList.remove('hidden');
   });
-  tl.querySelectorAll('.photos video').forEach(v=>v.onclick=e=>{
-    // 直接点视频走原生控制条，不弹查看器
-    e.stopPropagation();
+  // 同一条记录内媒体：前移 / 后移 / 删除
+  tl.querySelectorAll('[data-mv]').forEach(b=>b.onclick=async()=>{
+    const e=entries.find(x=>x.id===b.dataset.id); if(!e)return;
+    const m=getMedia(e), i=+b.dataset.i, j=b.dataset.mv==='up'?i-1:i+1;
+    if(j<0||j>=m.length)return;
+    [m[i],m[j]]=[m[j],m[i]];
+    e.media=m; e.photos=m.filter(x=>x.type==='image').map(x=>x.blob);
+    e.videos=m.filter(x=>x.type==='video').map(x=>x.blob);
+    await dbPut('entries',e); renderTimeline();
+  });
+  tl.querySelectorAll('[data-md]').forEach(b=>b.onclick=async()=>{
+    const e=entries.find(x=>x.id===b.dataset.md); if(!e)return;
+    const m=getMedia(e);
+    if(!confirm('删除这张照片/视频？'))return;
+    m.splice(+b.dataset.i,1);
+    e.media=m; e.photos=m.filter(x=>x.type==='image').map(x=>x.blob);
+    e.videos=m.filter(x=>x.type==='video').map(x=>x.blob);
+    await dbPut('entries',e); await loadAll();
+  });
+  // 整条记录上移下移
+  tl.querySelectorAll('[data-row]').forEach(b=>b.onclick=async()=>{
+    const cur=sortEntries(entries.filter(x=>!tag&&!kw?true:x.tag===tag));
+    // 以当前完整列表为准重新编号
+    const all=sortEntries(entries);
+    const idx=all.findIndex(x=>x.id===b.dataset.id);
+    const j=b.dataset.row==='up'?idx-1:idx+1;
+    if(idx<0||j<0||j>=all.length)return;
+    [all[idx],all[j]]=[all[j],all[idx]];
+    all.forEach((x,k)=>{x.sortOrder=k});
+    for(const x of all)await dbPut('entries',x);
+    await loadAll();
   });
 }
 function renderGrowth(){
@@ -434,7 +569,7 @@ $('#btnSave').onclick=async()=>{
   const record={
     id:uid(),title,date,tag:$('#fTag').value,desc:$('#fDesc').value.trim(),
     photos,videos,
-    media:pendingPhotos.map(p=>({type:p.type||'image'}))
+    media:pendingPhotos.map(p=>({type:p.type||'image',blob:p.blob}))
   };
   await dbPut('entries',record);
   // 立即同步内存，保证保存后无需刷新即可看到
@@ -455,6 +590,100 @@ $('#btnGrowth').onclick=async()=>{
 };
 $('#filterTag').onchange=renderTimeline;
 $('#filterKw').oninput=renderTimeline;
+
+/* 排序模式开关 */
+function syncReorderUI(){
+  const b=$('#btnReorder');
+  b.textContent=reorderMode?'✅ 完成排序':'↕️ 调整记录顺序';
+  b.classList.toggle('btn-primary',reorderMode);
+  b.classList.toggle('btn-ghost',!reorderMode);
+  $('#btnResetOrder').hidden=!reorderMode;
+  renderTimeline();
+}
+$('#btnReorder').onclick=()=>{reorderMode=!reorderMode;syncReorderUI()};
+$('#btnResetOrder').onclick=async()=>{
+  if(!confirm('恢复为按日期自动排序？手动调整的顺序会被清除。'))return;
+  for(const e of entries){ delete e.sortOrder; await dbPut('entries',e); }
+  reorderMode=false; await loadAll(); syncReorderUI();
+};
+
+/* ================= 编辑记录 ================= */
+let editingId=null, editMedia=[];
+function openEdit(id){
+  const e=entries.find(x=>x.id===id); if(!e)return;
+  editingId=id;
+  $('#eTitle').value=e.title||'';
+  $('#eDate').value=e.date||'';
+  $('#eTag').innerHTML=document.querySelector('#fTag').innerHTML;
+  $('#eTag').value=e.tag||'📷 照片';
+  $('#eDesc').value=e.desc||'';
+  editMedia=getMedia(e).map(m=>({type:m.type,blob:m.blob}));
+  renderEditMedia();
+  $('#editor').classList.remove('hidden');
+}
+function renderEditMedia(){
+  $('#eMedia').innerHTML=editMedia.length?editMedia.map((m,i)=>{
+    const url=URL.createObjectURL(m.blob);
+    const inner=m.type==='video'
+      ? `<video src="${url}" muted playsinline preload="metadata"></video><span class="vbadge">▶ 视频</span>`
+      : `<img src="${url}" alt="">`;
+    return `<div class="em">
+      ${inner}
+      <button data-edel="${i}" title="删除">✕</button>
+      <span class="mv">
+        <button data-emv="up" data-i="${i}" ${i===0?'style="opacity:.35"':''}>◀</button>
+        <button data-emv="down" data-i="${i}" ${i===editMedia.length-1?'style="opacity:.35"':''}>▶</button>
+      </span></div>`;
+  }).join(''):'<div style="color:#a89696;font-size:.85rem;grid-column:1/-1">暂无照片或视频</div>';
+
+  document.querySelectorAll('[data-edel]').forEach(b=>b.onclick=()=>{
+    editMedia.splice(+b.dataset.edel,1);renderEditMedia();
+  });
+  document.querySelectorAll('[data-emv]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.i, j=b.dataset.emv==='up'?i-1:i+1;
+    if(j<0||j>=editMedia.length)return;
+    [editMedia[i],editMedia[j]]=[editMedia[j],editMedia[i]];
+    renderEditMedia();
+  });
+}
+$('#eAddBtn').onclick=()=>$('#eAddFile').click();
+$('#eAddFile').onchange=async e=>{
+  const arr=Array.from(e.target.files||[]);
+  $('#eAddFile').value='';
+  let skipBig=0;
+  for(const f of arr){
+    const isImg=f.type.startsWith('image/'), isVid=f.type.startsWith('video/');
+    if(!isImg&&!isVid)continue;
+    if(isVid){
+      if(f.size>VIDEO_MAX){skipBig++;continue}
+      editMedia.push({type:'video',blob:f});
+    }else{
+      editMedia.push({type:'image',blob:(await compress(f))||f});
+    }
+    renderEditMedia();
+  }
+  if(skipBig)alert(`${skipBig} 个视频超过 80MB 已跳过`);
+};
+$('#eCancel').onclick=()=>{$('#editor').classList.add('hidden');editingId=null};
+$('#editor').onclick=e=>{
+  if(e.target.id==='editor'){$('#editor').classList.add('hidden');editingId=null}
+};
+$('#eSave').onclick=async()=>{
+  const e=entries.find(x=>x.id===editingId); if(!e)return;
+  const date=$('#eDate').value;
+  if(!date){alert('请选择日期');return}
+  e.title=$('#eTitle').value.trim();
+  e.date=date;
+  e.tag=$('#eTag').value;
+  e.desc=$('#eDesc').value.trim();
+  e.media=editMedia.map(m=>({type:m.type,blob:m.blob}));
+  e.photos=editMedia.filter(m=>m.type==='image').map(m=>m.blob);
+  e.videos=editMedia.filter(m=>m.type==='video').map(m=>m.blob);
+  await dbPut('entries',e);
+  $('#editor').classList.add('hidden');editingId=null;
+  renderHome();renderTimeline();
+  alert('✅ 修改已保存');
+};
 $('#viewer').onclick=e=>{
   if(e.target.tagName==='VIDEO')return;
   $('#viewer').classList.add('hidden');$('#viewerVid').pause();
