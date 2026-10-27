@@ -372,10 +372,26 @@ function renderHome(){
     <div class="stat"><b>${todayFeeds.length}次</b><span>今日母乳<br><span style="font-size:.68rem">${todayMl}ml</span></span></div>
     <div class="stat"><b>${growthData.length}</b><span>生长数据</span></div>
     <div class="stat"><b>${entries.filter(e=>e.tag==='🎉 里程碑').length}</b><span>里程碑</span></div>`;
-  const recent=sortEntries(entries).slice(0,5);
-  $('#recentList').innerHTML=recent.length?recent.map(e=>`
-    <div class="record"><span>${e.tag} ${e.title||'(无标题)'}<span class="age-badge">${calcAge(baby&&baby.birth,e.date)}</span></span>
-    <b>${e.date}</b></div>`).join('')
+  /* 最近记录：成长记录 + 身高体重 + 母乳 统一按时间倒序 */
+  const items=[];
+  sortEntries(entries).forEach(e=>items.push({
+    ts:e.date, day:e.date, label:`${e.tag} ${e.title||'(无标题)'}`,
+    age:calcAge(baby&&baby.birth,e.date)
+  }));
+  [...growthData].sort((a,b)=>b.date.localeCompare(a.date)).forEach(g=>{
+    const parts=[g.height?`${g.height}cm`:'',g.weight?`${g.weight}kg`:''].filter(Boolean).join(' / ');
+    items.push({ts:g.date,day:g.date,label:`📏 身高体重 · ${parts||'—'}`,
+      age:calcAge(baby&&baby.birth,g.date)});
+  });
+  [...feeds].sort((a,b)=>b.ts.localeCompare(a.ts)).forEach(f=>{
+    items.push({ts:f.ts,day:(f.ts||'').slice(0,10),label:`🍼 吸母乳 · ${f.ml}ml`,
+      time:(f.ts||'').slice(11,16),age:calcAge(baby&&baby.birth,(f.ts||'').slice(0,10))});
+  });
+  items.sort((a,b)=>b.ts.localeCompare(a.ts));
+  const recent=items.slice(0,8);
+  $('#recentList').innerHTML=recent.length?recent.map(x=>`
+    <div class="record"><span>${x.label}<span class="age-badge">${x.age}</span></span>
+    <b>${x.day}${x.time?' '+x.time:''}</b></div>`).join('')
     :'<div class="empty"><span class="emoji">🌱</span>还没有记录，去添加第一条吧！</div>';
 }
 /* 统一取出一条记录的有序媒体列表 [{type:'image'|'video', blob}] */
