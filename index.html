@@ -404,7 +404,7 @@ function getMedia(entry){
   (entry.videos||[]).forEach(b=>out.push({type:'video',blob:b}));
   return out;
 }
-/* 记录排序：有 sortOrder 用手动顺序，否则按日期倒序 */
+/* 记录排序：有 sortOrder 用手动顺序，否则按上传时间倒序（新上传在最上方），旧记录退回按日期 */
 function sortEntries(list){
   return list.slice().sort((a,b)=>{
     const ao=(a.sortOrder===undefined||a.sortOrder===null)?null:a.sortOrder;
@@ -412,7 +412,9 @@ function sortEntries(list){
     if(ao!==null&&bo!==null&&ao!==bo)return ao-bo;
     if(ao!==null&&bo===null)return -1;
     if(ao===null&&bo!==null)return 1;
-    return b.date.localeCompare(a.date);
+    const at=a.createdAt||new Date(a.date+'T00:00:00').getTime()||0;
+    const bt=b.createdAt||new Date(b.date+'T00:00:00').getTime()||0;
+    return bt-at;
   });
 }
 let reorderMode=false; // 时间轴手动排序模式
@@ -623,7 +625,8 @@ $('#btnSave').onclick=async()=>{
   const record={
     id:uid(),title,date,tag:$('#fTag').value,desc:$('#fDesc').value.trim(),
     photos,videos,
-    media:pendingPhotos.map(p=>({type:p.type||'image',blob:p.blob}))
+    media:pendingPhotos.map(p=>({type:p.type||'image',blob:p.blob})),
+    createdAt:Date.now()
   };
   await dbPut('entries',record);
   // 立即同步内存，保证保存后无需刷新即可看到
