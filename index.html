@@ -404,20 +404,30 @@ function getMedia(entry){
   (entry.videos||[]).forEach(b=>out.push({type:'video',blob:b}));
   return out;
 }
-/* 记录排序：有 sortOrder 用手动顺序，否则按上传时间倒序（新上传在最上方），旧记录退回按日期 */
+/* 记录排序：
+   1) 所有记录都没有 sortOrder → 按上传时间倒序（新上传在最上方），旧记录退回按日期
+   2) 只要有一半以上记录带 sortOrder（用户手动排过序）→ 按 sortOrder 排，
+      但新保存的记录会自动拿到最小 sortOrder-1，保证仍然在最上方 */
 function sortEntries(list){
+  const hasOrder=list.filter(x=>x.sortOrder!==undefined&&x.sortOrder!==null);
+  const manual=hasOrder.length>0&&hasOrder.length*2>=list.length;
   return list.slice().sort((a,b)=>{
-    const ao=(a.sortOrder===undefined||a.sortOrder===null)?null:a.sortOrder;
-    const bo=(b.sortOrder===undefined||b.sortOrder===null)?null:b.sortOrder;
-    if(ao!==null&&bo!==null&&ao!==bo)return ao-bo;
-    if(ao!==null&&bo===null)return -1;
-    if(ao===null&&bo!==null)return 1;
+    if(manual){
+      const ao=(a.sortOrder===undefined||a.sortOrder===null)?-Infinity:a.sortOrder;
+      const bo=(b.sortOrder===undefined||b.sortOrder===null)?-Infinity:b.sortOrder;
+      if(ao!==bo)return ao-bo;
+    }
     const at=a.createdAt||new Date(a.date+'T00:00:00').getTime()||0;
     const bt=b.createdAt||new Date(b.date+'T00:00:00').getTime()||0;
     return bt-at;
   });
 }
 let reorderMode=false; // 时间轴手动排序模式
+/* 新保存的记录：若用户曾手动排序过，给它最小序号-1，保证仍排在时间轴最上方 */
+function assignTopOrder(rec){
+  const os=entries.map(x=>x.sortOrder).filter(v=>v!==undefined&&v!==null);
+  if(os.length)rec.sortOrder=Math.min(...os)-1;
+}
 
 function renderTimeline(){
   const tag=$('#filterTag').value, kw=$('#filterKw').value.trim().toLowerCase();
@@ -628,6 +638,7 @@ $('#btnSave').onclick=async()=>{
     media:pendingPhotos.map(p=>({type:p.type||'image',blob:p.blob})),
     createdAt:Date.now()
   };
+  assignTopOrder(record);
   await dbPut('entries',record);
   // 立即同步内存，保证保存后无需刷新即可看到
   entries.push(record);
