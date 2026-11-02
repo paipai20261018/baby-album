@@ -1,4 +1,4 @@
-const CACHE = 'baby-album-v4';
+const CACHE = 'baby-album-v5';
 const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
