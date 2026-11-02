@@ -169,17 +169,10 @@
       </div>
     </div>
     <div class="card">
-      <h2>🍼 喂奶记录</h2>
+      <h2>🍼 吸母乳记录</h2>
       <div class="row">
         <div><label>时间</label><input id="fFeedTime" type="datetime-local"></div>
-        <div><label>类型</label><select id="fFeedType">
-          <option value="母乳">🍼 母乳</option>
-          <option value="奶粉">🥛 奶粉</option>
-        </select></div>
-      </div>
-      <div class="row">
-        <div><label>奶量 (ml)</label><input id="fFeedMl" type="number" min="0" step="1" placeholder="如 120"></div>
-        <div><label>备注（可选）</label><input id="fFeedNote" placeholder="如：吃了几分钟睡着"></div>
+        <div><label>毫升 (ml)</label><input id="fFeedMl" type="number" min="0" step="1" placeholder="如 120"></div>
       </div>
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <span style="font-size:.8rem;color:var(--muted);line-height:34px">快捷：</span>
@@ -189,8 +182,32 @@
         <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-quickml="150">150ml</button>
         <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" id="btnNow">此刻</button>
       </div>
-      <div class="actions"><button class="btn btn-primary" id="btnFeed">💾 保存喂奶记录</button></div>
+      <div class="actions"><button class="btn btn-primary" id="btnFeed">💾 保存吸乳记录</button></div>
       <div id="feedRecent" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>🥛 喂奶记录（给宝宝喂）</h2>
+      <div class="row">
+        <div><label>时间</label><input id="nkTime" type="datetime-local"></div>
+        <div><label>类型</label><select id="nkType">
+          <option value="母乳">🍼 母乳</option>
+          <option value="奶粉">🥛 奶粉</option>
+        </select></div>
+      </div>
+      <div class="row">
+        <div><label>奶量 (ml)</label><input id="nkMl" type="number" min="0" step="1" placeholder="如 120"></div>
+        <div><label>备注（可选）</label><input id="nkNote" placeholder="如：吃了几分钟睡着"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <span style="font-size:.8rem;color:var(--muted);line-height:34px">快捷：</span>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-nkml="60">60ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-nkml="90">90ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-nkml="120">120ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" data-nkml="150">150ml</button>
+        <button class="btn btn-ghost" style="padding:5px 12px;font-size:.82rem" id="nkNow">此刻</button>
+      </div>
+      <div class="actions"><button class="btn btn-primary" id="btnNursing">💾 保存喂奶记录</button></div>
+      <div id="nursingRecent" style="margin-top:10px"></div>
     </div>
     <div class="card">
       <h2>快速记录身高体重</h2>
@@ -221,10 +238,16 @@
   <!-- 趋势 -->
   <section id="tab-trend" class="hidden">
     <div class="card">
-      <h2>🍼 喂奶量趋势</h2>
+      <h2>🍼 吸母乳量趋势</h2>
       <div id="feedSummary" style="margin-bottom:8px"></div>
       <canvas id="milkChart" width="880" height="340" style="width:100%"></canvas>
       <div id="feedAllList" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>🥛 喂奶量趋势（给宝宝喂）</h2>
+      <div id="nursingSummary" style="margin-bottom:8px"></div>
+      <canvas id="nursingChart" width="880" height="340" style="width:100%"></canvas>
+      <div id="nursingAllList" style="margin-top:12px"></div>
     </div>
     <div class="card">
       <h2>📏 身高体重记录</h2>
@@ -370,13 +393,18 @@ function renderHome(){
   const nPhotos=entries.reduce((a,e)=>a+(e.photos||[]).length,0);
   const nVideos=entries.reduce((a,e)=>a+(e.videos||[]).length,0);
   const today=localDateStr();
-  const todayFeeds=feeds.filter(f=>(f.ts||'').slice(0,10)===today);
+  const pumpFeeds=feeds.filter(f=>f.kind!=='feed');
+  const todayFeeds=pumpFeeds.filter(f=>(f.ts||'').slice(0,10)===today);
   const todayMl=todayFeeds.reduce((a,f)=>a+(f.ml||0),0);
+  const feedAll=feeds.filter(f=>f.kind==='feed');
+  const todayNk=feedAll.filter(f=>(f.ts||'').slice(0,10)===today);
+  const todayNkMl=todayNk.reduce((a,f)=>a+(f.ml||0),0);
   $('#stats').innerHTML=`
     <div class="stat"><b>${entries.length}</b><span>成长记录</span></div>
     <div class="stat"><b>${nPhotos}</b><span>照片</span></div>
     <div class="stat"><b>${nVideos}</b><span>视频</span></div>
-    <div class="stat"><b>${todayFeeds.length}次</b><span>今日喂奶<br><span style="font-size:.68rem">${todayMl}ml</span></span></div>
+    <div class="stat"><b>${todayFeeds.length}次</b><span>今日吸乳<br><span style="font-size:.68rem">${todayMl}ml</span></span></div>
+    <div class="stat"><b>${todayNk.length}次</b><span>今日喂奶<br><span style="font-size:.68rem">${todayNkMl}ml</span></span></div>
     <div class="stat"><b>${growthData.length}</b><span>生长数据</span></div>
     <div class="stat"><b>${entries.filter(e=>e.tag==='🎉 里程碑').length}</b><span>里程碑</span></div>`;
   /* 最近记录：成长记录 + 身高体重 + 母乳 统一按时间倒序 */
@@ -390,8 +418,12 @@ function renderHome(){
     items.push({ts:g.date,day:g.date,label:`📏 身高体重 · ${parts||'—'}`,
       age:calcAge(baby&&baby.birth,g.date)});
   });
-  [...feeds].sort((a,b)=>b.ts.localeCompare(a.ts)).forEach(f=>{
-    items.push({ts:f.ts,day:(f.ts||'').slice(0,10),label:`${f.type==='奶粉'?'🥛 奶粉':'🍼 母乳'} · ${f.ml}ml`,
+  pumpFeeds.slice().sort((a,b)=>b.ts.localeCompare(a.ts)).forEach(f=>{
+    items.push({ts:f.ts,day:(f.ts||'').slice(0,10),label:`🍼 吸母乳 · ${f.ml}ml`,
+      time:(f.ts||'').slice(11,16),age:calcAge(baby&&baby.birth,(f.ts||'').slice(0,10))});
+  });
+  feedAll.slice().sort((a,b)=>b.ts.localeCompare(a.ts)).forEach(f=>{
+    items.push({ts:f.ts,day:(f.ts||'').slice(0,10),label:`${f.type==='奶粉'?'🥛 喂奶粉':'🍼 喂母乳'} · ${f.ml}ml`,
       time:(f.ts||'').slice(11,16),age:calcAge(baby&&baby.birth,(f.ts||'').slice(0,10))});
   });
   items.sort((a,b)=>b.ts.localeCompare(a.ts));
@@ -572,7 +604,7 @@ function renderTags(){
 }
 async function loadAll(){
   entries=await dbAll('entries');growthData=await dbAll('growth');feeds=await dbAll('feeds');
-  renderHome();renderTimeline();renderGrowth();renderFeedRecent();
+  renderHome();renderTimeline();renderGrowth();renderFeedRecent();renderNursingRecent();
 }
 
 /* ================= 交互 ================= */
@@ -664,7 +696,7 @@ $('#btnGrowth').onclick=async()=>{
   alert('✅ 已保存生长数据');loadAll();
 };
 
-/* ================= 喂奶记录 ================= */
+/* ================= 吸母乳记录 ================= */
 function nowLocal(){
   const d=new Date(),p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -675,29 +707,54 @@ document.querySelectorAll('[data-quickml]').forEach(b=>b.onclick=()=>{$('#fFeedM
 $('#btnFeed').onclick=async()=>{
   const ts=$('#fFeedTime').value, ml=parseInt($('#fFeedMl').value,10);
   if(!ts){alert('请选择时间');return}
-  if(isNaN(ml)||ml<=0){alert('请填写奶量（毫升）');return}
-  const rec={id:uid(),ts,ml,type:$('#fFeedType').value||'母乳',note:$('#fFeedNote').value.trim()};
-  await dbPut('feeds',rec);
-  $('#fFeedMl').value='';$('#fFeedNote').value='';
+  if(isNaN(ml)||ml<=0){alert('请填写毫升数');return}
+  await dbPut('feeds',{id:uid(),ts,ml});
+  $('#fFeedMl').value='';
   await loadAll();
-  alert(`✅ 已保存 ${rec.type} ${ml}ml`);
+  alert(`✅ 已保存吸乳 ${ml}ml`);
 };
-function feedIcon(f){return f.type==='奶粉'?'🥛':'🍼'}
 function renderFeedRecent(){
-  const list=[...feeds].sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,5);
+  const list=[...feeds].filter(f=>f.kind!=='feed').sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,5);
   $('#feedRecent').innerHTML=list.length
     ?'<div style="font-size:.8rem;color:var(--muted);margin-bottom:4px">最近 5 次</div>'+
-     list.map(f=>`<div class="record"><span>${feedIcon(f)} ${f.type||'母乳'} ${f.ts.replace('T',' ')}${f.note?' <span style="color:var(--muted);font-size:.78rem">'+f.note+'</span>':''}</span><b>${f.ml} ml</b></div>`).join('')
+     list.map(f=>`<div class="record"><span>🍼 ${f.ts.replace('T',' ')}</span><b>${f.ml} ml</b></div>`).join('')
+    :'';
+}
+
+/* ================= 喂奶记录（给宝宝喂） ================= */
+$('#nkTime').value=nowLocal();
+$('#nkNow').onclick=()=>{$('#nkTime').value=nowLocal()};
+document.querySelectorAll('[data-nkml]').forEach(b=>b.onclick=()=>{$('#nkMl').value=b.dataset.nkml});
+$('#btnNursing').onclick=async()=>{
+  const ts=$('#nkTime').value, ml=parseInt($('#nkMl').value,10);
+  if(!ts){alert('请选择时间');return}
+  if(isNaN(ml)||ml<=0){alert('请填写奶量（毫升）');return}
+  const rec={id:uid(),ts,ml,kind:'feed',type:$('#nkType').value||'母乳',note:$('#nkNote').value.trim()};
+  await dbPut('feeds',rec);
+  $('#nkMl').value='';$('#nkNote').value='';
+  await loadAll();
+  alert(`✅ 已保存喂奶（${rec.type}）${ml}ml`);
+};
+function nkIcon(f){return f.type==='奶粉'?'🥛':'🍼'}
+function renderNursingRecent(){
+  const list=[...feeds].filter(f=>f.kind==='feed').sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,5);
+  $('#nursingRecent').innerHTML=list.length
+    ?'<div style="font-size:.8rem;color:var(--muted);margin-bottom:4px">最近 5 次</div>'+
+     list.map(f=>`<div class="record"><span>${nkIcon(f)} ${f.type||'母乳'} ${f.ts.replace('T',' ')}${f.note?' <span style="color:var(--muted);font-size:.78rem">'+f.note+'</span>':''}</span><b>${f.ml} ml</b></div>`).join('')
     :'';
 }
 
 /* ================= 趋势页 ================= */
 function renderTrend(){
   renderGrowth();
-  // 按天汇总母乳量（最近 14 天，无数据的天补 0）
+  trendBlock(feeds.filter(f=>f.kind!=='feed'),'#feedSummary','#milkChart','#feedAllList','🍼','还没有吸乳记录，去「添加」页记一笔吧');
+  trendBlock(feeds.filter(f=>f.kind==='feed'),'#nursingSummary','#nursingChart','#nursingAllList','🥛','还没有喂奶记录，去「添加」页记一笔吧');
+}
+function trendBlock(list,sumSel,chartSel,listSel,icon,emptyMsg){
+  // 按天汇总奶量（无数据的天补 0，最多显示最近 30 天）
   const byDay={};
-  for(const f of feeds){const d=(f.ts||'').slice(0,10);if(d)byDay[d]=(byDay[d]||0)+(f.ml||0)}
-  const days=[...new Set([...Object.keys(byDay)])].sort();
+  for(const f of list){const d=(f.ts||'').slice(0,10);if(d)byDay[d]=(byDay[d]||0)+(f.ml||0)}
+  const days=Object.keys(byDay).sort();
   let series=[];
   if(days.length){
     const start=new Date(days[0]+'T00:00:00'), end=new Date(days[days.length-1]+'T00:00:00');
@@ -713,32 +770,33 @@ function renderTrend(){
   const today=nowLocal().slice(0,10);
   const todayMl=byDay[today]||0;
   const best=series.length?series.reduce((a,b)=>b.ml>a.ml?b:a):null;
-  $('#feedSummary').innerHTML=feeds.length?`
+  $(sumSel).innerHTML=list.length?`
     <div class="stats" style="grid-template-columns:repeat(3,1fr);margin:0">
       <div class="stat"><b>${todayMl}ml</b><span>今日总量</span></div>
       <div class="stat"><b>${avg7}ml</b><span>近7天日均</span></div>
       <div class="stat"><b>${best?best.ml+'ml':''}</b><span>单日最高${best?`<br><span style="font-size:.68rem">${best.day.slice(5)}</span>`:''}</span></div>
     </div>`
-    :'<div class="empty" style="padding:16px 0"><span class="emoji">🍼</span>还没有喂奶记录，去「添加」页记一笔吧</div>';
-  drawMilkChart(series);
+    :'<div class="empty" style="padding:16px 0"><span class="emoji">'+icon+'</span>'+emptyMsg+'</div>';
+  drawMilkChart(series,chartSel);
   // 明细列表（最近 20 条）
-  const all=[...feeds].sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,20);
-  $('#feedAllList').innerHTML=all.length
+  const all=[...list].sort((a,b)=>b.ts.localeCompare(a.ts)).slice(0,20);
+  $(listSel).innerHTML=all.length
     ?'<div style="font-size:.85rem;color:var(--muted);margin-bottom:4px">最近 20 次记录</div>'+
      all.map(f=>{
        const d=f.ts.slice(0,10),t=f.ts.slice(11,16);
-       return `<div class="record"><span>${feedIcon(f)} ${f.type||'母乳'} ${d} ${t}
+       const title=f.kind==='feed'?`${nkIcon(f)} 喂${f.type||'母乳'}`:`${icon} 吸母乳`;
+       return `<div class="record"><span>${title} ${d} ${t}
          <span class="age-badge">${calcAge(baby&&baby.birth,d)}</span>${f.note?'<br><span style="color:var(--muted);font-size:.78rem">'+f.note+'</span>':''}</span>
          <span><b>${f.ml} ml</b>
          <button class="btn btn-danger" style="padding:2px 8px;font-size:.7rem;margin-left:8px" data-fdel="${f.id}">删</button></span></div>`;
      }).join('')
     :'';
   document.querySelectorAll('[data-fdel]').forEach(b=>b.onclick=async()=>{
-    if(confirm('删除这条喂奶记录？')){await dbDel('feeds',b.dataset.fdel);await loadAll();renderTrend()}
+    if(confirm('删除这条记录？')){await dbDel('feeds',b.dataset.fdel);await loadAll();renderTrend()}
   });
 }
-function drawMilkChart(series){
-  const c=$('#milkChart'),ctx=c.getContext('2d');
+function drawMilkChart(series,chartSel='#milkChart'){
+  const c=$(chartSel),ctx=c.getContext('2d');
   ctx.clearRect(0,0,c.width,c.height);
   if(series.length<2){ctx.fillStyle='#a89696';ctx.font='15px sans-serif';
     ctx.textAlign='center';
